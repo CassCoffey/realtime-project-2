@@ -5,10 +5,26 @@ const socketio = require('socket.io');
 const port = process.env.PORT || process.env.NODE_PORT || 3000;
 
 const index = fs.readFileSync(`${__dirname}/../hosted/index.html`);
+const cssFile = fs.readFileSync(`${__dirname}/../hosted/clientStyle.css`);
+const scriptFile = fs.readFileSync(`${__dirname}/../hosted/clientScript.js`);
 
 const onRequest = (request, response) => {
-  response.writeHead(200, { 'Content-Type': 'text/html' });
-  response.write(index);
+  switch (request.url) {
+    case '/clientStyle.css':
+      response.writeHead(200, { 'Content-Type': 'text/css' });
+      response.write(cssFile);
+      break;
+
+    case '/clientScript.js':
+      response.writeHead(200, { 'Content-Type': 'text/babel' });
+      response.write(scriptFile);
+      break;
+
+    default:
+      response.writeHead(200, { 'Content-Type': 'text/html' });
+      response.write(index);
+  }
+
   response.end();
 };
 
@@ -17,31 +33,120 @@ const app = http.createServer(onRequest).listen(port);
 const io = socketio(app);
 
 const users = {};
+var pellets = [];
+const MAX_PELLETS = 50;
+const MAX_RADIUS = 200;
+const MIN_RADIUS = 10;
+const MAX_SPEED = 3;
+const MIN_SPEED = 0.6;
 const color = ['black', 'green', 'red', 'blue', 'pink', 'grey', 'brown'];
+
+const addPellets = () => {
+  if (pellets.length > MAX_PELLETS)
+  {
+	  return;
+  }
+	
+  var numPellets = Math.floor(Math.random() * 6);
+  for (var i = 0; i < numPellets; i++)
+  {
+	var tempPellet =
+    { x: Math.floor(Math.random() * 1280),
+      y: Math.floor(Math.random() * 720),
+      width: 10,
+	  height: 10,
+      color: 'purple' };
+	pellets.push(tempPellet);
+  }
+}
 
 const update = () => {
   const keys = Object.keys(users);
   for (let i = 0; i < keys.length; i++) {
     const user = users[keys[i]];
-    user.velocity += 1;
-    user.y += user.velocity;
-    const floor = 720 - user.height;
-    if (user.y > floor) {
-      user.y = floor;
-      user.velocity = 0;
-      user.grounded = true;
+
+	if (user.y < 0 + user.radius) {
+      user.y = 0 + user.radius;
     }
-    if (user.x < 0) {
-      user.x = 0;
+    if (user.y > 720 - user.radius) {
+      user.y = 720 - user.radius;
     }
-    if (user.x > 1280 - user.width) {
-      user.x = 1280 - user.width;
+    if (user.x < 0 + user.radius) {
+      user.x = 0 + user.radius;
     }
+    if (user.x > 1280 - user.radius) {
+      user.x = 1280 - user.radius;
+    }
+	
+	// pellet collision
+	for (let j = 0; j < pellets.length; j++)
+	{
+		let pellet = pellets[j];
+		
+		var dx = user.x - (pellet.x + (pellet.width / 2));
+        var dy = user.y - (pellet.y + (pellet.height / 2));
+        var distance = Math.sqrt(dx * dx + dy * dy);
+		
+		if (distance < user.radius + (pellet.width / 2))
+		{
+			pellets.splice(j, 1);
+			if (user.radius < MAX_RADIUS)
+			{
+				user.radius += 2;
+			}
+			if (user.speed > MIN_SPEED)
+			{
+				user.speed -= 0.1;
+			}
+		}
+	}
+	
+	// User Collision
+	for (let j = 0; j < keys.length; j++) {
+      const otherUser = users[keys[j]];
+	  
+	  var dx = user.x - otherUser.x;
+      var dy = user.y - otherUser.y;
+      var distance = Math.sqrt(dx * dx + dy * dy);
+	  
+	  if (user != otherUser && distance < user.radius + otherUser.radius)
+	  {
+	    if (user.radius > otherUser.radius && otherUser.radius > MIN_RADIUS)
+	    {
+	  	  if (user.radius < MAX_RADIUS)
+	  	  {
+	  	    user.radius += 1;
+	  	  }
+	  	  if (user.speed > MIN_SPEED)
+	      {
+	        user.speed -= 0.05;
+	      }
+	    }
+	    else if (user.radius < otherUser.radius && user.radius > MIN_RADIUS)
+	    {
+	  	  user.radius -= 1;
+		  
+	  	  if (user.speed > MAX_SPEED)
+	      {
+	        user.speed += 0.05;
+	      }
+	    }
+	    else
+	    {
+	  	  var angle = Math.atan2(dy,dx);
+          var nx = Math.cos(angle) * user.speed;
+          var ny = Math.sin(angle) * user.speed;
+          user.x += nx;
+	      user.y += ny;
+	    }
+	  }
+	}
+	
     const time = new Date().getTime();
     user.lastUpdate = time;
   }
 
-  io.sockets.in('room1').emit('draw', { users });
+  io.sockets.in('room1').emit('draw', { users, pellets });
 };
 
 const onJoined = (sock) => {
@@ -50,18 +155,16 @@ const onJoined = (sock) => {
     socket.join('room1');
     const time = new Date().getTime();
     const x = Math.floor((Math.random() * (1280 - 50)) + 50);
-    const y = Math.floor(20);
+    const y = Math.floor((Math.random() * (720 - 50)) + 50);
     socket.user = `user${(Math.floor((Math.random() * 1000)) + 1)}`;
     socket.currentColor = 0;
     users[socket.user] =
     { lastUpdate: time,
       x,
       y,
-      width: 50,
-      height: 50,
-      color: color[0],
-      velocity: 0,
-      grounded: false };
+      radius: 12,
+	  speed: 4,
+      color: color[0] };
   });
   socket.on('cycleColor', () => {
     socket.currentColor++;
@@ -72,13 +175,21 @@ const onJoined = (sock) => {
     users[socket.user].color = color[socket.currentColor];
   });
   socket.on('move', (data) => {
-    users[socket.user].x += data.move;
-  });
-  socket.on('jump', () => {
-    if (users[socket.user].grounded) {
-      users[socket.user].velocity = -20;
-      users[socket.user].grounded = false;
+	// snippet from http://stackoverflow.com/questions/3592040/javascript-function-that-works-like-actionscripts-normalize1
+	x = data.x;
+	y = data.y;
+	if((x == 0 && y == 0) || users[socket.user].speed == 0) {
+	  users[socket.user].x += 0;
+	  users[socket.user].y += 0;
     }
+	else
+	{
+	  var angle = Math.atan2(y,x);
+      var nx = Math.cos(angle) * users[socket.user].speed;
+      var ny = Math.sin(angle) * users[socket.user].speed;
+      users[socket.user].x += nx;
+	  users[socket.user].y += ny;
+	}
   });
 };
 
@@ -95,4 +206,5 @@ io.sockets.on('connection', (socket) => {
   onDisconnect(socket);
 });
 
-setInterval(update, 1000 / 10);
+setInterval(update, 1000 / 30);
+setInterval(addPellets, 5000);
