@@ -23,6 +23,7 @@ myKeys.KEYBOARD = Object.freeze({
 });
 myKeys.keydown = [];
 
+// Connect to the server
 const connectSocket = (e) => {
 	socket = io.connect();
 	
@@ -52,6 +53,7 @@ const connectSocket = (e) => {
 	});
 };
 
+// Draw users and pellets based on server feedback
 const draw = (data) => {
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 	
@@ -81,6 +83,7 @@ const draw = (data) => {
 				percent = 1;
 			}
 			
+			// Lerp the server info, since it's only sent 30fps
 			let changeX = drawCall.x - oldDrawCall.x;
 			let changeY = drawCall.y - oldDrawCall.y;
 			let changeR = drawCall.radius - oldDrawCall.radius;
@@ -102,6 +105,7 @@ const draw = (data) => {
 	}
 }
 
+// Set up event listeners
 const setup = () => {
 	// event listeners
 	window.addEventListener("keydown",function(e){
@@ -113,6 +117,7 @@ const setup = () => {
 	});
 }
 
+// Update draw list based on the server's info
 const handleMessage = (data) => {
 	lastUpdate = new Date().getTime();
 	oldDraws = draws;
@@ -124,6 +129,7 @@ const update = () => {
 	checkKeys();
 }
 
+// Move based on user input
 const checkKeys = () => {
 	if (myKeys.keydown[myKeys.KEYBOARD.KEY_A])
 	{

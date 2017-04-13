@@ -40,6 +40,7 @@ const MIN_RADIUS = 10;
 const MAX_SPEED = 3;
 const MIN_SPEED = 0.6;
 
+// Creates pellets per update
 const addPellets = () => {
   if (pellets.length > MAX_PELLETS) {
     return;
@@ -57,11 +58,12 @@ const addPellets = () => {
   }
 };
 
+// Moves users and checks collisions
 const update = () => {
   const keys = Object.keys(users);
   for (let i = 0; i < keys.length; i++) {
     const user = users[keys[i]];
-
+    
     if (user.y < 0 + user.radius) {
       user.y = 0 + user.radius;
     }
@@ -74,15 +76,15 @@ const update = () => {
     if (user.x > 1280 - user.radius) {
       user.x = 1280 - user.radius;
     }
-
+    
     // pellet collision
     for (let j = 0; j < pellets.length; j++) {
       const pellet = pellets[j];
-
+    
       const dx = user.x - (pellet.x + (pellet.width / 2));
       const dy = user.y - (pellet.y + (pellet.height / 2));
       const distance = Math.sqrt((dx * dx) + (dy * dy));
-
+    
       if (distance < user.radius + (pellet.width / 2)) {
         pellets.splice(j, 1);
         if (user.radius < MAX_RADIUS) {
@@ -93,15 +95,15 @@ const update = () => {
         }
       }
     }
-
+    
     // User Collision
     for (let j = 0; j < keys.length; j++) {
       const otherUser = users[keys[j]];
-
+    
       const dx = user.x - otherUser.x;
       const dy = user.y - otherUser.y;
       const distance = Math.sqrt((dx * dx) + (dy * dy));
-
+    
       if (user !== otherUser && distance < user.radius + otherUser.radius) {
         if (user.radius > otherUser.radius && otherUser.radius > MIN_RADIUS) {
           if (user.radius < MAX_RADIUS) {
@@ -112,7 +114,7 @@ const update = () => {
           }
         } else if (user.radius < otherUser.radius && user.radius > MIN_RADIUS) {
           user.radius -= 1;
-
+    
           if (user.speed < MAX_SPEED) {
             user.speed += 0.05;
           }
@@ -125,18 +127,20 @@ const update = () => {
         }
       }
     }
-
+    
     const time = new Date().getTime();
     user.lastUpdate = time;
   }
-
+  
   io.sockets.in('room1').emit('draw', { users, pellets });
 };
 
+// Called when a socket joins
 const onJoined = (sock) => {
   const socket = sock;
   socket.on('join', (data) => {
     socket.join('room1');
+	// init user
     const time = new Date().getTime();
     const x = Math.floor((Math.random() * (1280 - 50)) + 50);
     const y = Math.floor((Math.random() * (720 - 50)) + 50);
@@ -151,6 +155,7 @@ const onJoined = (sock) => {
       color: data.color };
     socket.emit('connected', null);
   });
+  // Normalize and apply movement
   socket.on('move', (data) => {
     // snippet from http://stackoverflow.com/questions/3592040/javascript-function-that-works-like-actionscripts-normalize1
     const x = data.x;
@@ -168,6 +173,7 @@ const onJoined = (sock) => {
   });
 };
 
+// Handle disconnects
 const onDisconnect = (sock) => {
   const socket = sock;
 
@@ -181,5 +187,6 @@ io.sockets.on('connection', (socket) => {
   onDisconnect(socket);
 });
 
+// Set update frequencies
 setInterval(update, 1000 / 30);
-setInterval(addPellets, 500);
+setInterval(addPellets, 5000);
