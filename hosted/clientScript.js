@@ -4,14 +4,14 @@ var loops = 0, ticks = 1000 / 30, maxFrameSkip = 10, nextGameTick = (new Date).g
 
 var canvas;
 var ctx;
+var user;
+var color;
 
 let socket;
 let oldDraws = {};
 let draws = {};
 let pellets= [];
 let lastUpdate = 0;
-
-const user = `user${(Math.floor((Math.random()*1000))+1)}`;
 
 var myKeys = {};
 myKeys.KEYBOARD = Object.freeze({
@@ -26,9 +26,25 @@ myKeys.keydown = [];
 const connectSocket = (e) => {
 	socket = io.connect();
 	
+	user = document.querySelector("#username").value;
+	if (!user) {
+			user = 'unknown';
+	}
+	
+	color = document.querySelector("#color").value;
+	
 	socket.on('connect', () => {
 		console.log('connecting');
-		socket.emit('join', null);
+		socket.emit('join', { user, color});
+	});
+	
+	socket.on('connected', () => {				
+		document.querySelector("#login").style.display = "none";
+		document.querySelector("#game").style.display = "block";
+		
+		setup();
+		setInterval(update, 1000 / 60);
+		setInterval(draw, 1000 / 60);
 	});
 	
 	socket.on('draw', (data) => {
@@ -69,10 +85,19 @@ const draw = (data) => {
 			let changeY = drawCall.y - oldDrawCall.y;
 			let changeR = drawCall.radius - oldDrawCall.radius;
 			
+			let lerpPosX = oldDrawCall.x + (changeX * percent);
+			let lerpPosY = oldDrawCall.y + (changeY * percent);
+			let lerpRadius = oldDrawCall.radius + (changeR * percent);
+			
 			ctx.fillStyle = drawCall.color;
 			ctx.beginPath();
-			ctx.arc(oldDrawCall.x + (changeX * percent), oldDrawCall.y + (changeY * percent),oldDrawCall.radius + (changeR * percent),0,2*Math.PI);
+			ctx.arc(lerpPosX, lerpPosY, lerpRadius,0,2*Math.PI);
 			ctx.fill();
+			
+			ctx.fillStyle = "white";
+			ctx.font = (lerpRadius / 2) + "px Anton";
+			ctx.textAlign = "center";
+			ctx.strokeText(drawCall.user, lerpPosX, lerpPosY + (lerpRadius/8));
 		}
 	}
 }
@@ -81,21 +106,11 @@ const setup = () => {
 	// event listeners
 	window.addEventListener("keydown",function(e){
 		myKeys.keydown[e.keyCode] = true;
-		
-		// pausing and resuming
-		var char = String.fromCharCode(e.keyCode);
-		if (char == "f" || char == "F"){
-			cycleColor();
-		}
 	});
 		
 	window.addEventListener("keyup",function(e){
 		myKeys.keydown[e.keyCode] = false;
 	});
-}
-
-const cycleColor = () => {
-	socket.emit('cycleColor', null);
 }
 
 const handleMessage = (data) => {
@@ -131,10 +146,8 @@ const checkKeys = () => {
 const init = () => {
 	canvas = document.getElementById("mainCanvas");
 	ctx = canvas.getContext("2d");
-	connectSocket();
-	setup();
-	setInterval(update, 1000 / 60);
-	setInterval(draw, 1000 / 60);
+	const connect = document.querySelector("#connect");
+	connect.addEventListener('click', connectSocket);
 };
 
 window.onload = init;

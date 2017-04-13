@@ -39,21 +39,20 @@ const MAX_RADIUS = 200;
 const MIN_RADIUS = 10;
 const MAX_SPEED = 3;
 const MIN_SPEED = 0.6;
-const color = ['black', 'green', 'red', 'blue', 'pink', 'grey', 'brown'];
 
 const addPellets = () => {
   if (pellets.length > MAX_PELLETS) {
     return;
   }
 
-  const numPellets = Math.floor(Math.random() * 6);
+  const numPellets = Math.floor(Math.random() * 10);
   for (let i = 0; i < numPellets; i++) {
     const tempPellet =
-      { x: Math.floor(Math.random() * 1280),
-        y: Math.floor(Math.random() * 720),
+      { x: Math.floor(Math.random() * (1280 - 10)),
+        y: Math.floor(Math.random() * (720 - 10)),
         width: 10,
         height: 10,
-        color: 'purple' };
+        color: '#7325f3' };
     pellets.push(tempPellet);
   }
 };
@@ -114,7 +113,7 @@ const update = () => {
         } else if (user.radius < otherUser.radius && user.radius > MIN_RADIUS) {
           user.radius -= 1;
 
-          if (user.speed > MAX_SPEED) {
+          if (user.speed < MAX_SPEED) {
             user.speed += 0.05;
           }
         } else {
@@ -136,28 +135,21 @@ const update = () => {
 
 const onJoined = (sock) => {
   const socket = sock;
-  socket.on('join', () => {
+  socket.on('join', (data) => {
     socket.join('room1');
     const time = new Date().getTime();
     const x = Math.floor((Math.random() * (1280 - 50)) + 50);
     const y = Math.floor((Math.random() * (720 - 50)) + 50);
-    socket.user = `user${(Math.floor((Math.random() * 1000)) + 1)}`;
-    socket.currentColor = 0;
+    socket.user = data.user;
     users[socket.user] =
-    { lastUpdate: time,
+    { user: data.user,
+      lastUpdate: time,
       x,
       y,
       radius: 12,
       speed: 4,
-      color: color[0] };
-  });
-  socket.on('cycleColor', () => {
-    socket.currentColor++;
-    if (socket.currentColor >= color.length) {
-      socket.currentColor = 0;
-    }
-
-    users[socket.user].color = color[socket.currentColor];
+      color: data.color };
+    socket.emit('connected', null);
   });
   socket.on('move', (data) => {
     // snippet from http://stackoverflow.com/questions/3592040/javascript-function-that-works-like-actionscripts-normalize1
@@ -190,4 +182,4 @@ io.sockets.on('connection', (socket) => {
 });
 
 setInterval(update, 1000 / 30);
-setInterval(addPellets, 5000);
+setInterval(addPellets, 500);
